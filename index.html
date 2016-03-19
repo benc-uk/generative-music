@@ -1,24 +1,28 @@
 <head>
-  <title>Music Generator Thing</title>
+  <title>Music Generator</title>
   <style>
     body {font-family: Arial; background-color: #333333; color: #cccccc}
     td {text-align: center;}
     button {height: 32px; font-weight: bold; font-size:1.1em}
+    a {color: white}
   </style>
 </head>
 
-<h1>Music Generator Procedural Ambient Thing (MGPAT)</h1>
-<hr>
+<h1>Random Ambient Music Procedurally Generated (RAMPg)</h1>
+<p>
+  Idea and code taken from Christopher Alcock's <a href='http://variousmusicappsofchris.herokuapp.com/sym2'/>'Procedural cycle of thirds ambient thing'</a>. Modified and mangled to send MIDI by me, Ben Coleman. Source code on <a href='https://github.com/benc-uk/generative-music'>GitHub</a>
+  <h4>Usage Info</h4>
+  You will need view this page from a computer with a MIDI interface. This page only generates MIDI note on &amp; off messages, so for sounds to be heard you'll also need a synthesizer (or several synths / MIDI sound sources) each set to the relevant channels. Your browser might not be able to open the MIDI port if the device is plugged in after this pages is opened. If you have problems try closing your browser, checking your MIDI interface is attached and re-opening the page<br/><br/>
+  To apply changes to MIDI port, notes or intervals you need to click the green start button.<br/>
+  Enabling/disabling a channel is dynamic, no need to click stop or start
+</p>
 MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
 <button onclick='startMIDI()' style='color:darkgreen'><b>Start / Apply Changes</b></button>
 <button onclick='stopMIDI()' style='color:red'><b>Stop</b></button>
-<small>Click here to start, also to apply changes to MIDI port, notes or intervals</small>
-<br/>
-<br/>
+<button onclick='randomizeTable()' style='color:blue'><b>Randomize</b></button>
+
 <table cellpadding="8" border="1" id="main_tab">
-  <tr>
-    <th>Channel</th><th>Notes</th><th>Note Interval</th><th>Loop Interval</th><th>Enabled</th>
-  </tr>
+
 </table>
 
 <script>
@@ -33,35 +37,51 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
   var BASE_NOTE_MIDI   = 60;   // MIDI note number 69 = A4
   var MAX_CHANS        = 8;
 
-  // Build yhe table dynamically
-  for(var r = 0; r < MAX_CHANS; r++) {
-    var r_notes = [randNote(), randNote(), randNote()];
-    //var temp = ((Math.random() * NOTE_LEN) + NOTE_LEN_ADD) * 2;
-    var r_len =  roundHalf((Math.random() * NOTE_LEN) + NOTE_LEN_ADD);
-    var r_loop = Math.ceil(roundUpTo((r_len * 3) + (Math.random() * LOOP_PADDING_MAX), 4));
-    var td_html_row = `<tr>
-    <td>${r}</td>
-    <td><input id="${r}_notes" size="6" value="${r_notes}"/></td>
-    <td><input id="${r}_len" size="3" value="${r_len}"/></td>
-    <td><input id="${r}_loop" size="3" value="${r_loop}"/></td>
-    <td><input id="${r}_enabled" type="checkbox" checked></td>
-    </tr>`;
-    document.getElementById('main_tab').innerHTML += td_html_row;
-  }
-
   var midi = null;
   var midi_out = null;
   var midi_port_id = null;
   var track_loop_ids = [];
 
+  // Build the rest of the page
+  randomizeTable();
+
+  // Build yhe table dynamically
+  function randomizeTable() {
+    document.getElementById('main_tab').innerHTML = "<tr><th>Channel</th><th>Notes</th><th>Note Interval</th><th>Loop Interval</th><th>Enabled</th></tr>";
+    for(var r = 0; r < MAX_CHANS; r++) {
+      var r_notes = [randNote(), randNote(), randNote()];
+      //var temp = ((Math.random() * NOTE_LEN) + NOTE_LEN_ADD) * 2;
+      var r_len =  roundHalf((Math.random() * NOTE_LEN) + NOTE_LEN_ADD);
+      var r_loop = Math.ceil(roundUpTo((r_len * 3) + (Math.random() * LOOP_PADDING_MAX), 2));
+      var check = "checked"
+      if(r > 3) check = ""
+      var td_html_row = `<tr>
+      <td>${r}</td>
+      <td><input id="${r}_notes" size="6" value="${r_notes}"/></td>
+      <td><input id="${r}_len" size="3" value="${r_len}"/></td>
+      <td><input id="${r}_loop" size="3" value="${r_loop}"/></td>
+      <td><input id="${r}_enabled" type="checkbox" ${check}></td>
+      </tr>`;
+      document.getElementById('main_tab').innerHTML += td_html_row;
+    }
+  }
+
+  // =====================================================================================
+  //  Open the MIDI port and if successful start playing all tracks
+  // =====================================================================================
   function startMIDI() {
     if(midi_out)
       midi_out.close()
+
     midi_port_id = document.getElementById("midi_port").value;
-    // Starts here
+
+    // Open MIDI, onMIDISuccess callback function triggers actual playback
     navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
   }
 
+  // =====================================================================================
+  // Stop all timer loops, end send All-Notes-Off MIDI message to each channel
+  // =====================================================================================
   function stopMIDI() {
     if(!midi_out)
       return;
@@ -71,12 +91,15 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
     }
   }
 
+  // =====================================================================================
+  // Open MIDI port and call track_loop function for each channel/track
+  // =====================================================================================
   function onMIDISuccess(midiAccess) {
     midi = midiAccess;
 
     midi_out = midi.outputs.get(midi_port_id);
     if(!midi_out) {
-      console.log("Unable to open MIDI port: "+midi_port_id)
+      alert("Unable to open MIDI port: "+midi_port_id)
       return;
     }
     console.log("Opened MIDI port: "+midi_out.name)
@@ -85,10 +108,16 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
     }
   }
 
+  // =====================================================================================
+  // Error trap
+  // =====================================================================================
   function onMIDIFailure(msg) {
-    console.log("Failed to get MIDI access: " + msg);
+    alert("Failed to get MIDI access: " + msg);
   }
 
+  // =====================================================================================
+  // Grabs note & timing info from table, calls setInterval on threeNoteMelody to play notes
+  // =====================================================================================
   function track_loop(midi_chan) {
     clearInterval(track_loop_ids[midi_chan]);
 
@@ -97,12 +126,15 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
     var melodyLength = document.getElementById(midi_chan+"_loop").value;
     var gateTime = noteLength * GATE_LEN;
 
-    melody(midi_chan, noteLength, noteSet, gateTime);
+    threeNoteMelody(midi_chan, noteLength, noteSet, gateTime);
     console.log("Starting MIDI track loop on channel "+midi_chan);
-    track_loop_ids[midi_chan] = setInterval(melody, (1000 * melodyLength), midi_chan, noteLength, noteSet, gateTime)
+    track_loop_ids[midi_chan] = setInterval(threeNoteMelody, (1000 * melodyLength), midi_chan, noteLength, noteSet, gateTime)
   }
 
-  function melody(midi_chan, noteLength, noteSet, gateTime) {
+  // =====================================================================================
+  // Plays three notes in succession, each with a different offset (noteLength)
+  // =====================================================================================
+  function threeNoteMelody(midi_chan, noteLength, noteSet, gateTime) {
     if(!document.getElementById(midi_chan+"_enabled").checked)
       return;
     play(0, noteSet[0], gateTime, midi_chan)
@@ -110,6 +142,9 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
     play((2 * +noteLength), noteSet[2], gateTime, midi_chan)
   }
 
+  // =====================================================================================
+  // Timing helper
+  // =====================================================================================
   function timeInSeconds(time) {
     var seconds = time.getSeconds()
     var minutes = time.getMinutes()
@@ -118,11 +153,17 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
     return seconds + (minutes * 60) + (hours * 60 * 60) + (days * 60 * 60 * 24)
   }
 
+  // =====================================================================================
+  // Taken from http://variousmusicappsofchris.herokuapp.com/sym2 these sound better than random vals
+  // =====================================================================================
   function randNote() {
     var i = getRandomInt(0, 11);
     return [-12, -17, -20, -24, -5, -8, 0, 12, 16, 19, 4, 7][i];
   }
 
+  // =====================================================================================
+  // Taken from http://variousmusicappsofchris.herokuapp.com/sym2
+  // =====================================================================================
   function thirdsCycler(number) {
     if (number % 24 == 0){return [0, "major"]};
     if (number % 24 == 1){return [-3, "minor"]};
@@ -150,12 +191,17 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
     if (number % 24 == 23){return [4, "minor"]};
   }
 
+  // =====================================================================================
+  // Main play a note function, sends MIDI note on and note off
+  // =====================================================================================
   function play(delay, pitch, duration, midi_chan) {
     var progressiveTime = new Date();
     var secondsIntoMonth = timeInSeconds(progressiveTime);
+
     // This is the real magic
     var chordNumber = parseInt(secondsIntoMonth / CHORD_INTERVAL)
     var transpose = thirdsCycler(chordNumber)[0]
+
     var currentChordType = thirdsCycler(chordNumber)[1]
     if ([-20,-8,4,16,28].includes(pitch) && currentChordType == "minor") {
       pitch = pitch - 1
@@ -164,15 +210,18 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
     var startTime = window.performance.now() + (delay*1000.0);
     var endTime = startTime + (duration*1000.0);
 
+    // Send MIDI note messages, the note off message is delayed by note duration
     var noteOnMessage = [0x90 + midi_chan, (BASE_NOTE_MIDI + pitch + transpose), 0x7f];
     var noteOffMessage = [0x80 + midi_chan, (BASE_NOTE_MIDI + pitch + transpose), 0x7f];
     if(midi_out != null) {
-      //console.log("Channel: "+midi_chan+" playing: "+(pitch + transpose))
       midi_out.send(noteOnMessage, startTime);
       midi_out.send(noteOffMessage, endTime);
     }
   }
 
+  // =====================================================================================
+  // Math helper functions
+  // =====================================================================================
   function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
