@@ -1,0 +1,21 @@
+<tr id='t_0'>
+  <td>1</td>
+  <td><input id="0_notes" size="6"/></td>
+  <script>document.getElementById("0_notes").value = [randNote(), randNote(), randNote()];</script>
+  <td><input id="0_len" size="3"/></td>
+  <script>document.getElementById("0_len").value = roundToTwo((Math.random() * NOTE_LEN) + NOTE_LEN_ADD);</script>
+  <td><input id="0_loop" size="3"/></td>
+  <script>document.getElementById("0_loop").value = roundToTwo((document.getElementById("0_len").value * 3) + (Math.random() * LOOP_PADDING_MAX));</script>
+  <td><input id="0_enabled" type="checkbox" checked></td>
+</tr>
+
+<tr>
+  <td>2</td>
+  <td><input id="1_notes" size="6"/></td>
+  <script>document.getElementById("1_notes").value = [randNote(), randNote(), randNote()];</script>
+  <td><input id="1_len" size="3"/></td>
+  <script>document.getElementById("1_len").value = roundToTwo((Math.random() * NOTE_LEN) + NOTE_LEN_ADD);</script>
+  <td><input id="1_loop" size="3"/></td>
+  <script>document.getElementById("1_loop").value = roundToTwo((document.getElementById("1_len").value * 3) + (Math.random() * LOOP_PADDING_MAX));</script>
+  <td><input id="1_enabled" type="checkbox" checked></td>
+</tr>

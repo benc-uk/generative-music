@@ -1,0 +1,191 @@
+<head>
+  <title>Music Generator Thing</title>
+  <style>
+    body {font-family: Arial; background-color: #333333; color: #cccccc}
+    td {text-align: center;}
+    button {height: 32px; font-weight: bold; font-size:1.1em}
+  </style>
+</head>
+
+<h1>Music Generator Procedural Ambient Thing (MGPAT)</h1>
+<hr>
+MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
+<button onclick='startMIDI()' style='color:darkgreen'><b>Start / Apply Changes</b></button>
+<button onclick='stopMIDI()' style='color:red'><b>Stop</b></button>
+<small>Click here to start, also to apply changes to MIDI port, notes or intervals</small>
+<br/>
+<br/>
+<table cellpadding="8" border="1" id="main_tab">
+  <tr>
+    <th>Channel</th><th>Notes</th><th>Note Interval</th><th>Loop Interval</th><th>Enabled</th>
+  </tr>
+</table>
+
+<script>
+  // ##############################################
+  // Globals you might want to tweak
+  // ##############################################
+  var CHORD_INTERVAL   = 20;   // Seconds betweem chord changes
+  var GATE_LEN         = 0.5;  // Ramge: 0.1 - 1.0
+  var NOTE_LEN         = 4;  // Random note length in secs
+  var NOTE_LEN_ADD     = 0.3;  // Added to note length
+  var LOOP_PADDING_MAX = 15.0;  // Loops are 3 * note len, plus this random padding in secs
+  var BASE_NOTE_MIDI   = 60;   // MIDI note number 69 = A4
+  var MAX_CHANS        = 8;
+
+  // Build yhe table dynamically
+  for(var r = 0; r < MAX_CHANS; r++) {
+    var r_notes = [randNote(), randNote(), randNote()];
+    //var temp = ((Math.random() * NOTE_LEN) + NOTE_LEN_ADD) * 2;
+    var r_len =  roundHalf((Math.random() * NOTE_LEN) + NOTE_LEN_ADD);
+    var r_loop = Math.ceil(roundUpTo((r_len * 3) + (Math.random() * LOOP_PADDING_MAX), 4));
+    var td_html_row = `<tr>
+    <td>${r}</td>
+    <td><input id="${r}_notes" size="6" value="${r_notes}"/></td>
+    <td><input id="${r}_len" size="3" value="${r_len}"/></td>
+    <td><input id="${r}_loop" size="3" value="${r_loop}"/></td>
+    <td><input id="${r}_enabled" type="checkbox" checked></td>
+    </tr>`;
+    document.getElementById('main_tab').innerHTML += td_html_row;
+  }
+
+  var midi = null;
+  var midi_out = null;
+  var midi_port_id = null;
+  var track_loop_ids = [];
+
+  function startMIDI() {
+    if(midi_out)
+      midi_out.close()
+    midi_port_id = document.getElementById("midi_port").value;
+    // Starts here
+    navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
+  }
+
+  function stopMIDI() {
+    if(!midi_out)
+      return;
+    for(var r = 0; r < MAX_CHANS; r++) {
+      clearInterval(track_loop_ids[r]);
+      midi_out.send([176+r, 0x7B, 0]);
+    }
+  }
+
+  function onMIDISuccess(midiAccess) {
+    midi = midiAccess;
+
+    midi_out = midi.outputs.get(midi_port_id);
+    if(!midi_out) {
+      console.log("Unable to open MIDI port: "+midi_port_id)
+      return;
+    }
+    console.log("Opened MIDI port: "+midi_out.name)
+    for(var r = 0; r < MAX_CHANS; r++) {
+      track_loop(r);
+    }
+  }
+
+  function onMIDIFailure(msg) {
+    console.log("Failed to get MIDI access: " + msg);
+  }
+
+  function track_loop(midi_chan) {
+    clearInterval(track_loop_ids[midi_chan]);
+
+    var noteSet = JSON.parse("["+document.getElementById(midi_chan+"_notes").value+"]");
+    var noteLength = document.getElementById(midi_chan+"_len").value;
+    var melodyLength = document.getElementById(midi_chan+"_loop").value;
+    var gateTime = noteLength * GATE_LEN;
+
+    melody(midi_chan, noteLength, noteSet, gateTime);
+    console.log("Starting MIDI track loop on channel "+midi_chan);
+    track_loop_ids[midi_chan] = setInterval(melody, (1000 * melodyLength), midi_chan, noteLength, noteSet, gateTime)
+  }
+
+  function melody(midi_chan, noteLength, noteSet, gateTime) {
+    if(!document.getElementById(midi_chan+"_enabled").checked)
+      return;
+    play(0, noteSet[0], gateTime, midi_chan)
+    play((+noteLength), noteSet[1], gateTime, midi_chan)
+    play((2 * +noteLength), noteSet[2], gateTime, midi_chan)
+  }
+
+  function timeInSeconds(time) {
+    var seconds = time.getSeconds()
+    var minutes = time.getMinutes()
+    var hours = time.getHours()
+    var days = time.getUTCDate()
+    return seconds + (minutes * 60) + (hours * 60 * 60) + (days * 60 * 60 * 24)
+  }
+
+  function randNote() {
+    var i = getRandomInt(0, 11);
+    return [-12, -17, -20, -24, -5, -8, 0, 12, 16, 19, 4, 7][i];
+  }
+
+  function thirdsCycler(number) {
+    if (number % 24 == 0){return [0, "major"]};
+    if (number % 24 == 1){return [-3, "minor"]};
+    if (number % 24 == 2){return [5, "major"]};
+    if (number % 24 == 3){return [2, "minor"]};
+    if (number % 24 == 4){return [-2, "major"]};
+    if (number % 24 == 5){return [7, "minor"]};
+    if (number % 24 == 6){return [3, "major"]};
+    if (number % 24 == 7){return [0, "minor"]};
+    if (number % 24 == 8){return [8, "major"]};
+    if (number % 24 == 9){return [5, "minor"]};
+    if (number % 24 == 10){return [1, "major"]};
+    if (number % 24 == 11){return [-2, "minor"]};
+    if (number % 24 == 12){return [6, "major"]};
+    if (number % 24 == 13){return [3, "minor"]};
+    if (number % 24 == 14){return [-1, "major"]};
+    if (number % 24 == 15){return [8, "minor"]};
+    if (number % 24 == 16){return [4, "major"]};
+    if (number % 24 == 17){return [1, "minor"]};
+    if (number % 24 == 18){return [-3, "major"]};
+    if (number % 24 == 19){return [6, "minor"]};
+    if (number % 24 == 20){return [2, "major"]};
+    if (number % 24 == 21){return [-1, "minor"]};
+    if (number % 24 == 22){return [7, "major"]};
+    if (number % 24 == 23){return [4, "minor"]};
+  }
+
+  function play(delay, pitch, duration, midi_chan) {
+    var progressiveTime = new Date();
+    var secondsIntoMonth = timeInSeconds(progressiveTime);
+    // This is the real magic
+    var chordNumber = parseInt(secondsIntoMonth / CHORD_INTERVAL)
+    var transpose = thirdsCycler(chordNumber)[0]
+    var currentChordType = thirdsCycler(chordNumber)[1]
+    if ([-20,-8,4,16,28].includes(pitch) && currentChordType == "minor") {
+      pitch = pitch - 1
+    }
+
+    var startTime = window.performance.now() + (delay*1000.0);
+    var endTime = startTime + (duration*1000.0);
+
+    var noteOnMessage = [0x90 + midi_chan, (BASE_NOTE_MIDI + pitch + transpose), 0x7f];
+    var noteOffMessage = [0x80 + midi_chan, (BASE_NOTE_MIDI + pitch + transpose), 0x7f];
+    if(midi_out != null) {
+      //console.log("Channel: "+midi_chan+" playing: "+(pitch + transpose))
+      midi_out.send(noteOnMessage, startTime);
+      midi_out.send(noteOffMessage, endTime);
+    }
+  }
+
+  function getRandomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  function roundToTwo(num) {
+      return +(Math.round(num + "e+2")  + "e-2");
+  }
+
+  function roundHalf(num) {
+    return Math.round(num*4)/4;
+  }
+
+  function roundUpTo(num, factor) {
+    return num + factor - 1 - (num - 1) % factor;
+  }
+</script>
