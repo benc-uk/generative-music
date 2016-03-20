@@ -1,16 +1,23 @@
+<!DOCTYPE html>
+<html>
 <head>
-  <title>Music Generator</title>
+  <title>Random Ambient Music Procedurally Generated (RAMPg)</title>
   <style>
     body {font-family: Arial; background-color: #333333; color: #cccccc}
     td {text-align: center;}
     button {height: 32px; font-weight: bold; font-size:1.1em}
     a {color: white}
+    td {border: 1px solid #666666}
+    th {border: none}
+    td input {font-size: 14pt}
+    input[type=checkbox] { -moz-transform: scale(2); -webkit-transform: scale(2); padding: 10px }
   </style>
 </head>
 
+<body>
 <h1>Random Ambient Music Procedurally Generated (RAMPg)</h1>
 <p>
-  Idea and code taken from Christopher Alcock's wonderful <a href='http://variousmusicappsofchris.herokuapp.com/sym2'/>'Procedural cycle of thirds ambient thing'</a>. I've modified and mangled to send MIDI by. Source code on my <a href='https://github.com/benc-uk/generative-music'>GitHub</a>
+  Idea and code taken from Christopher Alcock's wonderful <a href='http://variousmusicappsofchris.herokuapp.com/sym2'>'Procedural cycle of thirds ambient thing'</a>. I've modified and mangled to send MIDI to external synthesizers. Source code on my <a href='https://github.com/benc-uk/generative-music'>GitHub</a>
   <h4>Usage Info</h4>
   You will need view this page from a computer with a MIDI interface. This page only generates MIDI note on &amp; off messages, so for sounds to be heard you'll also need a synthesizer (or several synths / MIDI sound sources) each set to the relevant channels. Your browser might not be able to open the MIDI port if the device is plugged in after this pages is opened. If you have problems try closing your browser, checking your MIDI interface is attached and re-opening the page<br/><br/>
   To apply changes to MIDI port, notes or intervals you need to (re)click the green start button.<br/>
@@ -21,9 +28,10 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
 <button onclick='stopMIDI()' style='color:red'><b>Stop</b></button>
 <button onclick='randomizeTable()' style='color:blue'><b>Randomize</b></button>
 
-<table cellpadding="8" border="1" id="main_tab">
+<table cellpadding="10" cellspacing="0" id="main_tab">
 
 </table>
+
 
 <script>
   // ##############################################
@@ -49,15 +57,15 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
   //  Open the MIDI port and if successful start playing all tracks
   // =====================================================================================
   function randomizeTable() {
-    document.getElementById('main_tab').innerHTML = "<tr><th>Channel</th><th>Notes</th><th>Note Interval</th><th>Loop Interval</th><th>Enabled</th></tr>";
+    document.getElementById('main_tab').innerHTML = "<tr><th>Status</th><th>Channel</th><th>Notes</th><th>Note Interval</th><th>Loop Interval</th><th>Enabled</th></tr>";
     for(var r = 0; r < MAX_CHANS; r++) {
       var r_notes = [randNote(), randNote(), randNote()];
-      //var temp = ((Math.random() * NOTE_LEN) + NOTE_LEN_ADD) * 2;
       var r_len =  roundHalf((Math.random() * NOTE_LEN) + NOTE_LEN_ADD);
       var r_loop = Math.ceil(roundUpTo((r_len * 3) + (Math.random() * LOOP_PADDING_MAX), 2));
       var check = "checked"
       if(r > 3) check = ""
       var td_html_row = `<tr>
+      <td><div id="${r}_light" style="width:20px; height:20px; background-color:darkred; margin:auto; border: 1px solid black"></div></td>
       <td>${r}</td>
       <td><input id="${r}_notes" size="6" value="${r_notes}"/></td>
       <td><input id="${r}_len" size="3" value="${r_len}"/></td>
@@ -78,7 +86,11 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
     midi_port_id = document.getElementById("midi_port").value;
 
     // Open MIDI, onMIDISuccess callback function triggers actual playback
-    navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
+    try {
+      navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
+    } catch(err) {
+      alert("Unable to call requestMIDIAccess()\nYour browser doesn't support MIDI, try using a good modern browser");
+    }
   }
 
   // =====================================================================================
@@ -139,9 +151,13 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
   function threeNoteMelody(midi_chan, noteLength, noteSet, gateTime) {
     if(!document.getElementById(midi_chan+"_enabled").checked)
       return;
-    play(0, noteSet[0], gateTime, midi_chan)
-    play((+noteLength), noteSet[1], gateTime, midi_chan)
-    play((2 * +noteLength), noteSet[2], gateTime, midi_chan)
+
+    play(0, noteSet[0], gateTime, midi_chan);
+    play(noteLength, noteSet[1], gateTime, midi_chan);
+    play((2 * noteLength), noteSet[2], gateTime, midi_chan);
+
+    setTimeout(function(){document.getElementById(midi_chan+"_light").style.backgroundColor = 'green'}, 0)
+    setTimeout(function(){document.getElementById(midi_chan+"_light").style.backgroundColor = 'darkred'}, noteLength * 3000.0)
   }
 
   // =====================================================================================
@@ -209,8 +225,8 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
       pitch = pitch - 1
     }
 
-    var startTime = window.performance.now() + (delay*1000.0);
-    var endTime = startTime + (duration*1000.0);
+    var startTime = window.performance.now() + (delay * 1000.0);
+    var endTime = startTime + (duration * 1000.0);
 
     // Send MIDI note messages, the note off message is delayed by note duration
     var noteOnMessage = [0x90 + midi_chan, (BASE_NOTE_MIDI + pitch + transpose), 0x7f];
@@ -240,3 +256,5 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
     return num + factor - 1 - (num - 1) % factor;
   }
 </script>
+</body>
+</html>
