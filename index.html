@@ -106,11 +106,19 @@ MIDI Output Port: <input id="midi_port" value="0" size="3"><br/><br/>
   }
 
   // =====================================================================================
-  // Open MIDI port and call track_loop function for each channel/track
+  // Handle MIDI access
   // =====================================================================================
   function onMIDISuccess(midiAccess) {
     midi = midiAccess;
+    openMIDI()
+    midi.onstatechange = openMIDI;
+  }
 
+  // =====================================================================================
+  // Open MIDI port. Call track_loop function for each channel/track
+  // =====================================================================================
+  function openMIDI() {
+    if(midi.outputs.size < 1) return;
     midi_out = midi.outputs.get(midi_port_id);
     if(!midi_out) {
       alert("Unable to open MIDI port: "+midi_port_id)
